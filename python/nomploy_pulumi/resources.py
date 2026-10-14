@@ -32,6 +32,14 @@ def _changed(olds: dict, news: dict, keys: list) -> bool:
     return any(olds.get(k) != news.get(k) for k in keys)
 
 
+def _clean(d: dict) -> dict:
+    """Drop None-valued keys so optional fields are omitted (not sent as JSON
+    null) — the API's zod schemas reject null for unset string fields. The
+    ``save*`` source calls keep their explicit nulls (those fields are nullable
+    and required-present)."""
+    return {k: v for k, v in d.items() if v is not None}
+
+
 def _opts(opts: Optional[pulumi.ResourceOptions]) -> pulumi.ResourceOptions:
     secret = pulumi.ResourceOptions(additional_secret_outputs=["api_key"])
     return pulumi.ResourceOptions.merge(opts, secret) if opts else secret
@@ -45,11 +53,13 @@ class _ProjectProvider(ResourceProvider):
         r = call(
             conn,
             "project.create",
-            {
-                "name": inputs["name"],
-                "description": inputs.get("description"),
-                "env": inputs.get("env"),
-            },
+            _clean(
+                {
+                    "name": inputs["name"],
+                    "description": inputs.get("description"),
+                    "env": inputs.get("env"),
+                }
+            ),
             "POST",
         )
         pid = r["project"]["projectId"]
@@ -72,12 +82,14 @@ class _ProjectProvider(ResourceProvider):
         call(
             _conn(news),
             "project.update",
-            {
-                "projectId": id_,
-                "name": news["name"],
-                "description": news.get("description"),
-                "env": news.get("env"),
-            },
+            _clean(
+                {
+                    "projectId": id_,
+                    "name": news["name"],
+                    "description": news.get("description"),
+                    "env": news.get("env"),
+                }
+            ),
             "POST",
         )
         return UpdateResult(outs={**news, "project_id": id_})
@@ -188,13 +200,15 @@ class _ApplicationProvider(ResourceProvider):
         r = call(
             conn,
             "application.create",
-            {
-                "name": inputs["name"],
-                "appName": inputs.get("app_name"),
-                "description": inputs.get("description"),
-                "environmentId": inputs["environment_id"],
-                "serverId": inputs.get("server_id"),
-            },
+            _clean(
+                {
+                    "name": inputs["name"],
+                    "appName": inputs.get("app_name"),
+                    "description": inputs.get("description"),
+                    "environmentId": inputs["environment_id"],
+                    "serverId": inputs.get("server_id"),
+                }
+            ),
             "POST",
         )
         app_id = r["applicationId"]
@@ -235,7 +249,7 @@ class _ApplicationProvider(ResourceProvider):
         call(
             conn,
             "application.update",
-            {"applicationId": id_, "name": news["name"], "description": news.get("description")},
+            _clean({"applicationId": id_, "name": news["name"], "description": news.get("description")}),
             "POST",
         )
         if _changed(olds, news, _APP_SOURCE_KEYS):
@@ -328,7 +342,7 @@ class _DomainProvider(ResourceProvider):
         return b
 
     def create(self, inputs):
-        r = call(_conn(inputs), "domain.create", self._body(inputs), "POST")
+        r = call(_conn(inputs), "domain.create", _clean(self._body(inputs)), "POST")
         did = r["domainId"]
         return CreateResult(id_=did, outs={**inputs, "domain_id": did})
 
@@ -353,7 +367,7 @@ class _DomainProvider(ResourceProvider):
         body.pop("applicationId", None)
         body.pop("composeId", None)
         body["domainId"] = id_
-        call(_conn(news), "domain.update", body, "POST")
+        call(_conn(news), "domain.update", _clean(body), "POST")
         return UpdateResult(outs={**news, "domain_id": id_})
 
     def delete(self, id_, props):
@@ -426,12 +440,11 @@ class _DatabaseProvider(ResourceProvider):
         conn = _conn(inputs)
         engine = inputs["engine"]
         id_key = f"{engine}Id"
-        r = call(
-            conn,
-            f"{engine}.create",
-            {**_db_body(inputs), "environmentId": inputs["environment_id"]},
-            "POST",
-        )
+        body = {**_db_body(inputs), "environmentId": inputs["environment_id"]}
+        # Always send a password field (empty => the server generates one); omitting
+        # it can fail validation.
+        body["databasePassword"] = inputs.get("database_password") or ""
+        r = call(conn, f"{engine}.create", body, "POST")
         did = r[id_key]
         if inputs.get("deploy"):
             trigger(conn, f"{engine}.deploy", {id_key: did})
