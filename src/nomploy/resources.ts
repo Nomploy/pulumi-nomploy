@@ -6,7 +6,7 @@
 // `additionalSecretOutputs`.
 
 import * as pulumi from "@pulumi/pulumi";
-import { type Conn, call } from "./client";
+import { type Conn, call, trigger } from "./client";
 
 // ─── shared helpers ──────────────────────────────────────────────────────────
 
@@ -209,12 +209,10 @@ const applicationProvider: pulumi.dynamic.ResourceProvider = {
 		const applicationId: string = r.applicationId;
 		await applyAppSource(conn, applicationId, inputs);
 		if (inputs.deploy) {
-			await call(
-				conn,
-				"application.deploy",
-				{ applicationId, title: "Pulumi deploy" },
-				"POST",
-			);
+			await trigger(conn, "application.deploy", {
+				applicationId,
+				title: "Pulumi deploy",
+			});
 		}
 		return {
 			id: applicationId,
@@ -265,12 +263,10 @@ const applicationProvider: pulumi.dynamic.ResourceProvider = {
 		if (sourceChanged) await applyAppSource(conn, id, news);
 		// Redeploy when the source changed (new image), if deploy is on.
 		if (news.deploy && sourceChanged) {
-			await call(
-				conn,
-				"application.deploy",
-				{ applicationId: id, title: "Pulumi redeploy" },
-				"POST",
-			);
+			await trigger(conn, "application.deploy", {
+				applicationId: id,
+				title: "Pulumi redeploy",
+			});
 		}
 		return { outs: { ...news, applicationId: id } };
 	},
@@ -461,7 +457,7 @@ const databaseProvider: pulumi.dynamic.ResourceProvider = {
 		);
 		const id: string = r[idKey];
 		if (inputs.deploy) {
-			await call(conn, `${engine}.deploy`, { [idKey]: id }, "POST");
+			await trigger(conn, `${engine}.deploy`, { [idKey]: id });
 		}
 		return { id, outs: { ...inputs, databaseId: id, appName: r.appName } };
 	},
@@ -499,7 +495,7 @@ const databaseProvider: pulumi.dynamic.ResourceProvider = {
 			"POST",
 		);
 		if (news.deploy && changed(olds, news, DB_FIELDS)) {
-			await call(conn, `${engine}.deploy`, { [idKey]: id }, "POST");
+			await trigger(conn, `${engine}.deploy`, { [idKey]: id });
 		}
 		return { outs: { ...news, databaseId: id } };
 	},
@@ -595,12 +591,10 @@ const composeProvider: pulumi.dynamic.ResourceProvider = {
 		);
 		const composeId: string = r.composeId;
 		if (inputs.deploy) {
-			await call(
-				conn,
-				"compose.deploy",
-				{ composeId, title: "Pulumi deploy" },
-				"POST",
-			);
+			await trigger(conn, "compose.deploy", {
+				composeId,
+				title: "Pulumi deploy",
+			});
 		}
 		return { id: composeId, outs: { ...inputs, composeId, appName: r.appName } };
 	},
@@ -626,12 +620,10 @@ const composeProvider: pulumi.dynamic.ResourceProvider = {
 			"POST",
 		);
 		if (news.deploy && changed(olds, news, COMPOSE_FIELDS)) {
-			await call(
-				conn,
-				"compose.deploy",
-				{ composeId: id, title: "Pulumi redeploy" },
-				"POST",
-			);
+			await trigger(conn, "compose.deploy", {
+				composeId: id,
+				title: "Pulumi redeploy",
+			});
 		}
 		return { outs: { ...news, composeId: id } };
 	},

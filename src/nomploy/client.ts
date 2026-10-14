@@ -50,6 +50,41 @@ export async function call<T = any>(
 	return (text ? JSON.parse(text) : undefined) as T;
 }
 
+/**
+ * Fire a long-running action (e.g. a deploy) without blocking on it. Some deploy
+ * endpoints (notably the databases' `<engine>.deploy`) run the deployment
+ * synchronously, so the HTTP request can stay open for minutes until a proxy
+ * drops the connection ("fetch failed") — even though the work proceeds. We send
+ * the request, wait up to `waitMs`, and treat a timeout as "triggered, left
+ * running". HTTP error responses still throw.
+ */
+export async function trigger(
+	conn: Conn,
+	procedure: string,
+	input: Record<string, unknown>,
+	waitMs = 20000,
+): Promise<void> {
+	const base = conn.endpoint.replace(/\/+$/, "");
+	try {
+		const res = await fetch(`${base}/api/${procedure}`, {
+			method: "POST",
+			headers: { "x-api-key": conn.apiKey, "content-type": "application/json" },
+			body: JSON.stringify(input),
+			signal: AbortSignal.timeout(waitMs),
+		});
+		if (!res.ok) {
+			const t = await res.text();
+			throw new Error(
+				`nomploy POST ${procedure} failed: ${res.status} ${res.statusText} — ${t.slice(0, 300)}`,
+			);
+		}
+	} catch (e: any) {
+		// Our own timeout → the deploy is long-running and already accepted.
+		if (e?.name === "TimeoutError" || e?.name === "AbortError") return;
+		throw e;
+	}
+}
+
 // ─── Typed helpers (from the generated OpenAPI types) ─────────────────────────
 // `get`/`post` take a spec path like "/project.create" and type the body/query +
 // response from `api-types.ts`. The dynamic providers mostly use the untyped
