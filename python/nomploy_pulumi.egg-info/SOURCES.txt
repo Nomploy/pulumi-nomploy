@@ -1,9 +1,0 @@
-pyproject.toml
-nomploy_pulumi/__init__.py
-nomploy_pulumi/_client.py
-nomploy_pulumi/resources.py
-nomploy_pulumi.egg-info/PKG-INFO
-nomploy_pulumi.egg-info/SOURCES.txt
-nomploy_pulumi.egg-info/dependency_links.txt
-nomploy_pulumi.egg-info/requires.txt
-nomploy_pulumi.egg-info/top_level.txt
