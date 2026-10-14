@@ -1,6 +1,11 @@
 node_modules/
 bin/
 *.log
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
 # Pulumi local/login state (never commit backend state)
 .pulumi/
 # Per-user stack config (may hold encrypted secrets) — users create their own

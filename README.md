@@ -1,14 +1,18 @@
 # pulumi-nomploy
 
 Manage **[nomploy](https://nomploy.com)** services **as code** with
-[Pulumi](https://www.pulumi.com/). A TypeScript **dynamic provider** that drives
-the panel's existing REST API — no separate API layer and no Go toolchain — so you
-can declare projects, applications, databases, domains and compose stacks in a
-Pulumi program and `pulumi up` them onto your cluster.
+[Pulumi](https://www.pulumi.com/) — a **dynamic provider** that drives the panel's
+existing REST API — no separate API layer and no Go toolchain — so you can declare
+projects, applications, databases, domains and compose stacks in a Pulumi program
+and `pulumi up` them onto your cluster.
 
-> **Status:** prototype. Resources and types are complete and type-check; validated
-> with `pulumi preview`. Run it against your own instance with `pulumi up` (see
-> *Quick start*). APIs may still change.
+Available in **TypeScript** (repo root) and **Python** ([`python/`](python/)). Both
+wrap the same REST API; because Pulumi dynamic providers are language-specific, each
+is its own implementation of the same resources.
+
+> **Status:** prototype. Resources and types are complete and type-check; the TS
+> version is validated end-to-end against a live cluster. Run it against your own
+> instance with `pulumi up` (see *Quick start*). APIs may still change.
 
 ## Why
 
@@ -119,6 +123,45 @@ paths at runtime); the typed helpers are for request bodies/queries and new code
 Regenerate against your instance: drop a fresh spec in `openapi.json` (from the
 nomploy repo's `apps/dokploy/scripts/generate-openapi.ts`, or `/api` at runtime)
 and run `npm run gen:types`.
+
+## Python
+
+The same resources are available in Python under [`python/`](python/) (a Pulumi
+Python dynamic provider — snake_case API).
+
+```bash
+cd python
+python3 -m venv venv && . venv/bin/activate
+pip install -r requirements.txt
+
+pulumi login --local
+pulumi stack init dev
+pulumi config set endpoint https://your-nomploy-instance.com
+pulumi config set apiKey     <your-x-api-key>  --secret
+pulumi config set dbPassword <postgres-pass>   --secret
+pulumi up
+```
+
+```python
+import pulumi
+import nomploy_pulumi as nomploy
+
+conn = dict(endpoint="https://your-nomploy-instance.com",
+            api_key=pulumi.Config().require_secret("apiKey"))
+
+project = nomploy.Project("web", name="web", **conn)
+
+nomploy.Application("api", name="api", environment_id=project.environment_id,
+                    docker_image="ghcr.io/you/api:latest", deploy=True, **conn)
+
+nomploy.Postgres("db", name="db", environment_id=project.environment_id,
+                 database_name="app", database_user="app",
+                 database_password=pulumi.Config().require_secret("dbPassword"),
+                 deploy=True, **conn)
+```
+
+Resources: `Project`, `Application`, `Domain`, `Postgres` / `Mysql` / `Mariadb` /
+`Mongo` / `Redis` (or `Database(engine=...)`), `Compose` — same shape as TypeScript.
 
 ## Notes & caveats
 
