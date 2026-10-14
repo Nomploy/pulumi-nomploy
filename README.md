@@ -1,24 +1,25 @@
-# nomploy + Pulumi (prototype)
+# pulumi-nomploy
 
-Manage nomploy services **as code**. This is a Pulumi **dynamic provider** written
-in TypeScript that talks to the panel's existing REST API — no separate API layer,
-no Go toolchain. It's a prototype that demonstrates the `project → application →
-domain` lifecycle; extend it from there.
+Manage **[nomploy](https://nomploy.com)** services **as code** with
+[Pulumi](https://www.pulumi.com/). A TypeScript **dynamic provider** that drives
+the panel's existing REST API — no separate API layer and no Go toolchain — so you
+can declare projects, applications, databases, domains and compose stacks in a
+Pulumi program and `pulumi up` them onto your cluster.
 
-> **Status:** prototype. It creates/reads/updates/deletes projects, applications
-> (**Docker image or generic git source**, with **deploy**), domains, the five
-> **databases** (postgres / mysql / mariadb / mongo / redis), and **compose**
-> services (raw compose file or Nomad Pack), with **typed API types generated from
-> the OpenAPI spec**. It has not yet been run against a live cluster (`pulumi up`).
+> **Status:** prototype. Resources and types are complete and type-check; validated
+> with `pulumi preview`. Run it against your own instance with `pulumi up` (see
+> *Quick start*). APIs may still change.
 
-## How it works
+## Why
 
 nomploy exposes its whole tRPC router set over HTTP (via `@dokploy/trpc-openapi`)
 at `<endpoint>/api/<router>.<procedure>` — GET for queries, POST for mutations,
-auth with the `x-api-key` header. Each Pulumi resource here maps its CRUD to those
-procedures:
+`x-api-key` auth. This provider maps each resource's lifecycle onto those
+procedures, so everything the panel can create, you can declare.
 
-| Pulumi resource | create | read | update | delete |
+## Resources
+
+| Resource | Create | Read | Update | Delete |
 |---|---|---|---|---|
 | `Project` | `project.create` | `project.one` | `project.update` | `project.remove` |
 | `Application` | `application.create` | `application.one` | `application.update` | `application.delete` |
@@ -26,91 +27,115 @@ procedures:
 | `Postgres` / `Mysql` / `Mariadb` / `Mongo` / `Redis` (`Database`) | `<engine>.create` | `<engine>.one` | `<engine>.update` | `<engine>.remove` |
 | `Compose` | `compose.create` | `compose.one` | `compose.update` | `compose.delete` |
 
-`Application` sets its source via `application.saveDockerProvider` (image) **or**
-`application.saveGitProvider` + `application.saveBuildType` (git), and deploys with
-`application.deploy`. Each `Database` likewise deploys with `<engine>.deploy`.
-
-`project.create` auto-creates a production environment and returns its id, exposed
-as `project.environmentId` — pass it to `Application`.
-
-An `Application` can also run a prebuilt image and deploy itself:
-
-```ts
-new nomploy.Application("api", {
-  ...conn,
-  name: "api",
-  environmentId: project.environmentId,
-  dockerImage: "nginxdemos/hello:latest",   // application.saveDockerProvider
-  // registryUrl / registryUsername / registryPassword for a private registry
-  deploy: true,                              // application.deploy on create + on image change
-});
-```
-
-A `Compose` service from a raw compose file (translated to a Nomad job), deployed:
-
-```ts
-new nomploy.Compose("stack", {
-  ...conn,
-  name: "stack",
-  environmentId: project.environmentId,
-  composeFile: fs.readFileSync("docker-compose.yml", "utf8"),
-  deploy: true,
-});
-// …or a Nomad Pack: { nomadPack: "traefik", nomadPackRegistry: "github.com/Nomploy/nomad-packs" }
-```
+- **`Project`** auto-creates a production environment; its `environmentId` output
+  feeds `Application` / `Database` / `Compose`.
+- **`Application`** sets its source from a **Docker image** (`dockerImage` +
+  optional registry creds → `application.saveDockerProvider`) **or** a **generic
+  git repo** (`gitUrl` / `gitBranch` / `buildType` → `application.saveGitProvider`
+  + `saveBuildType`), and with `deploy: true` runs `application.deploy` on create
+  and whenever the source changes.
+- **`Database`** (or the named `Postgres`/… subclasses) covers all five engines
+  with the same shape, and `deploy: true`.
+- **`Compose`** takes a raw `composeFile` (translated to a Nomad job) or a
+  `nomadPack` + `nomadPackRegistry`, with `deploy`.
 
 ## Prerequisites
 
 - [Pulumi CLI](https://www.pulumi.com/docs/install/) and Node.js 18+.
-- An API key: panel → **Settings → API / Swagger** (or `POST /api/user.createApiKey`
-  from an authenticated session). The first key must be minted from the UI/session;
-  after that the provider only needs the key.
+- An **API key**: panel → **Settings → API / Swagger** (or `POST
+  /api/user.createApiKey` from an authenticated session). The first key must be
+  minted from the UI/session; after that the provider only needs the key.
 
-## Use it
+## Quick start
 
 ```bash
 npm install
 
+# Local state backend (or `pulumi login` to Pulumi Cloud)
+pulumi login --local
 pulumi stack init dev
-pulumi config set endpoint https://your-nomploy-instance.com
-pulumi config set apiKey <your-x-api-key> --secret
-pulumi config set host app.example.com      # optional — omit to skip the Domain
 
-pulumi preview     # see the plan
-pulumi up          # create project → application → domain
+pulumi config set endpoint https://your-nomploy-instance.com
+pulumi config set apiKey     <your-x-api-key>  --secret
+pulumi config set dbPassword <postgres-pass>   --secret
+pulumi config set host app.example.com         # optional — routes a domain
+
+pulumi preview     # plan
+pulumi up          # project → postgres + application(+deploy) → domain
 pulumi destroy     # tear it all down
 ```
 
-`apiKey` is stored encrypted in the Pulumi state (it's marked a secret output).
+`apiKey` (and other secrets) are stored encrypted in the Pulumi state — the
+resources mark it an `additionalSecretOutput`.
 
-## Extending
+## Using it in your own program
 
-- **Docker / git source + deploy:** done — `Application` accepts `dockerImage`
-  (+ registry creds) **or** `gitUrl`/`gitBranch` (+ `buildType`, `gitSshKeyId` for
-  private), plus `deploy: true`.
-- **Databases:** done — `Postgres` / `Mysql` / `Mariadb` / `Mongo` / `Redis` (or the
-  generic `Database` with an `engine`), each with `deploy`.
-- **Compose:** done — `Compose` takes a raw `composeFile` (composeType "nomad") or a
-  `nomadPack` + `nomadPackRegistry` (composeType "nomad-pack"), with `deploy`.
-- **Codegen (done):** `src/nomploy/api-types.ts` is generated from the vendored
-  `openapi.json` (`npm run gen:types`, which runs `openapi-typescript`). `client.ts`
-  exposes typed `get`/`post` helpers plus `ApiBody<P>` / `ApiQuery<P>` /
-  `ApiResponse<P>` for any spec path `P` (e.g. `post(conn, "/project.create", { name })`
-  type-checks the body). Note: the spec's **response** schemas are thin, so the
-  providers still read create responses via the untyped `call` (which also builds the
-  DB engine's runtime paths); the typed helpers are for typed request bodies/queries
-  and new code.
-  The vendored `openapi.json` comes from the nomploy repo
-  (`apps/dokploy/scripts/generate-openapi.ts`) and can lag your instance — drop in a
-  fresh spec and re-run `npm run gen:types` to update the types.
+```ts
+import * as pulumi from "@pulumi/pulumi";
+import * as nomploy from "pulumi-nomploy/src/nomploy";
 
-## Notes / caveats
+const conn = {
+  endpoint: "https://your-nomploy-instance.com",
+  apiKey: new pulumi.Config().requireSecret("apiKey"),
+};
 
-- This is a **tRPC-flavored REST** API: everything is GET/POST to
-  `/<router>.<procedure>`, IDs go in the body/query (not the URL path). The client
-  in `src/nomploy/client.ts` handles that.
+const project = new nomploy.Project("web", { ...conn, name: "web" });
+
+new nomploy.Application("api", {
+  ...conn,
+  name: "api",
+  environmentId: project.environmentId,
+  dockerImage: "ghcr.io/you/api:latest",   // or gitUrl/gitBranch/buildType
+  deploy: true,
+});
+
+new nomploy.Postgres("db", {
+  ...conn,
+  name: "db",
+  environmentId: project.environmentId,
+  databaseName: "app",
+  databaseUser: "app",
+  databasePassword: new pulumi.Config().requireSecret("dbPassword"),
+  deploy: true,
+});
+```
+
+## Typed API client (codegen)
+
+`src/nomploy/api-types.ts` is generated from the panel's OpenAPI spec with
+`openapi-typescript` (`npm run gen:types`, reading the vendored `openapi.json`).
+`client.ts` exports typed helpers for any spec path:
+
+```ts
+import { post, type ApiBody } from "pulumi-nomploy/src/nomploy";
+await post(conn, "/project.create", { name: "x" }); // body is type-checked
+```
+
+The dynamic providers themselves use the uniform untyped `call` (the spec's
+**response** schemas are thin, and the `Database` provider builds `<engine>.*`
+paths at runtime); the typed helpers are for request bodies/queries and new code.
+
+Regenerate against your instance: drop a fresh spec in `openapi.json` (from the
+nomploy repo's `apps/dokploy/scripts/generate-openapi.ts`, or `/api` at runtime)
+and run `npm run gen:types`.
+
+## Notes & caveats
+
+- **tRPC-flavored REST:** everything is GET/POST to `/<router>.<procedure>`; ids go
+  in the body/query, not the URL path. `src/nomploy/client.ts` handles that.
 - Validate the JSON codec against your instance — the tRPC layer uses superjson
-  internally; the OpenAPI handler is expected to use plain JSON, which this client
+  internally; the OpenAPI handler is expected to emit plain JSON, which this client
   assumes.
 - It's a **dynamic provider**, so connection details (`endpoint`, `apiKey`) travel
   as resource inputs rather than ambient config.
+- `Compose` destroy keeps volumes unless `deleteVolumesOnDestroy: true`.
+
+## Roadmap
+
+- Run against more real-world stacks; stabilise the resource APIs.
+- Optionally package as a proper Pulumi component/provider (published to npm).
+- A Terraform provider over the same REST API, if there's demand.
+
+## License
+
+Apache-2.0 (same permissive terms as the Apache-2.0 portions of nomploy).

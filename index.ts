@@ -1,9 +1,10 @@
-// Demo Pulumi program: provision a project → application → domain on nomploy.
+// Demo Pulumi program: provision a project → database + application → domain on nomploy.
 //
 // Config (set with `pulumi config set …`):
-//   nomploy-iac-demo:endpoint   https://your-nomploy-instance.com
-//   nomploy-iac-demo:apiKey     <your x-api-key>   (use --secret)
-//   nomploy-iac-demo:host       app.example.com    (the domain to route)
+//   pulumi-nomploy:endpoint     https://your-nomploy-instance.com
+//   pulumi-nomploy:apiKey       <your x-api-key>   (--secret)
+//   pulumi-nomploy:dbPassword   <postgres password> (--secret)
+//   pulumi-nomploy:host         app.example.com     (optional — routes a domain)
 
 import * as pulumi from "@pulumi/pulumi";
 import { Application, Domain, Postgres, Project } from "./src/nomploy";
@@ -50,10 +51,8 @@ const app = new Application("demo-app", {
 //     deploy: true,
 //   });
 
-export const databaseId = db.databaseId;
-
-// 3. Domain routed to the application (only when a host is configured).
-export const domainId = host
+// 3. Domain routed to the application (only when a `host` is configured).
+const domain = host
 	? new Domain("demo-domain", {
 			...conn,
 			host,
@@ -61,9 +60,13 @@ export const domainId = host
 			port: 80,
 			https: true,
 			certificateType: "letsencrypt",
-		}).domainId
+		})
 	: undefined;
 
 export const projectId = project.projectId;
 export const environmentId = project.environmentId;
 export const applicationId = app.applicationId;
+export const databaseId = db.databaseId;
+export const domainId = domain
+	? domain.domainId
+	: "(set the 'host' config to create a domain)";

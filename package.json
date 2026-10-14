@@ -3,6 +3,7 @@
 	"private": true,
 	"version": "0.1.0",
 	"description": "Pulumi provider for nomploy — manage services as code over the REST API.",
+	"license": "Apache-2.0",
 	"main": "index.ts",
 	"scripts": {
 		"gen:types": "openapi-typescript ./openapi.json -o src/nomploy/api-types.ts",

@@ -3,3 +3,5 @@ bin/
 *.log
 # Pulumi local/login state (never commit backend state)
 .pulumi/
+# Per-user stack config (may hold encrypted secrets) — users create their own
+Pulumi.*.yaml
