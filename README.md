@@ -129,6 +129,13 @@ and run `npm run gen:types`.
 - It's a **dynamic provider**, so connection details (`endpoint`, `apiKey`) travel
   as resource inputs rather than ambient config.
 - `Compose` destroy keeps volumes unless `deleteVolumesOnDestroy: true`.
+- **Database deploys are synchronous** (`<engine>.deploy` pulls the image, then
+  registers the Nomad job, then returns) — there's no async/streaming REST variant.
+  `deploy` waits up to ~2 min; the **first-ever pull of a new image** on a node can
+  take longer (and a proxy may cut a very long request). If a DB doesn't come up on
+  the first `pulumi up` with a brand-new image, deploy it once from the panel or
+  re-run `pulumi up` (the image is cached by then). Apps/compose deploy
+  asynchronously and return fast.
 
 ## Roadmap
 

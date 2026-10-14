@@ -51,18 +51,25 @@ export async function call<T = any>(
 }
 
 /**
- * Fire a long-running action (e.g. a deploy) without blocking on it. Some deploy
- * endpoints (notably the databases' `<engine>.deploy`) run the deployment
- * synchronously, so the HTTP request can stay open for minutes until a proxy
- * drops the connection ("fetch failed") — even though the work proceeds. We send
- * the request, wait up to `waitMs`, and treat a timeout as "triggered, left
- * running". HTTP error responses still throw.
+ * Fire a long-running action (e.g. a deploy) and wait up to `waitMs` for it.
+ *
+ * Some deploy endpoints — notably the databases' `<engine>.deploy` — run the
+ * deployment **synchronously** (they pull the image, then register the Nomad
+ * job, then return), so the request can stay open for a while. We wait up to
+ * `waitMs`; a timeout is treated as best-effort ("triggered"). HTTP errors throw.
+ *
+ * Caveat: a cold first-time pull of a *new* image can exceed `waitMs` (and a
+ * reverse proxy may cut a very long request), and the server ties the deploy to
+ * the request — so a timed-out cold deploy may not register. Once the image is
+ * cached on the node, deploys finish in seconds. If a DB doesn't come up on the
+ * first `pulumi up` with a brand-new image, deploy it once from the panel (or
+ * re-run `pulumi up` — the image is cached by then).
  */
 export async function trigger(
 	conn: Conn,
 	procedure: string,
 	input: Record<string, unknown>,
-	waitMs = 20000,
+	waitMs = 120000,
 ): Promise<void> {
 	const base = conn.endpoint.replace(/\/+$/, "");
 	try {
