@@ -10,3 +10,4 @@ venv/
 .pulumi/
 # Per-user stack config (may hold encrypted secrets) — users create their own
 Pulumi.*.yaml
+*.egg-info/
