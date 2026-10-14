@@ -15,7 +15,7 @@ import nomploy_pulumi as nomploy
 config = pulumi.Config()
 endpoint = config.require("endpoint")
 api_key = config.require_secret("apiKey")
-db_password = config.require_secret("dbPassword")
+db_password = config.get_secret("dbPassword")  # optional — server generates one if unset
 host = config.get("host")
 db_server_id = config.get("dbServerId")
 

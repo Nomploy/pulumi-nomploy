@@ -1,5 +1,7 @@
 name: nomploy-iac-demo-py
 runtime:
   name: python
+  options:
+    virtualenv: venv
 description: Manage nomploy services (project / application / database / domain / compose) as code via the REST API (Python).
 main: __main__.py
