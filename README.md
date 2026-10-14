@@ -59,6 +59,7 @@ pulumi config set endpoint https://your-nomploy-instance.com
 pulumi config set apiKey     <your-x-api-key>  --secret
 pulumi config set dbPassword <postgres-pass>   --secret
 pulumi config set host app.example.com         # optional — routes a domain
+pulumi config set dbServerId <worker-server-id> # optional — see Databases note
 
 pulumi preview     # plan
 pulumi up          # project → postgres + application(+deploy) → domain
@@ -129,6 +130,12 @@ and run `npm run gen:types`.
 - It's a **dynamic provider**, so connection details (`endpoint`, `apiKey`) travel
   as resource inputs rather than ambient config.
 - `Compose` destroy keeps volumes unless `deleteVolumesOnDestroy: true`.
+- **Database node placement.** A database binds its engine port (5432, 3306, …) as
+  a **static host port** and defaults to the **control plane**, which already runs
+  stateful services (often a Postgres on 5432). On a multi-node cluster a second DB
+  of the same engine on that node fails to place (`reserved port collision`) and
+  sits "deploying". Give databases a **`serverId`** (a worker node) so the port is
+  free — only one DB per engine-port per node. Changing `serverId` replaces the DB.
 - **Database deploys are synchronous** (`<engine>.deploy` pulls the image, then
   registers the Nomad job, then returns) — there's no async/streaming REST variant.
   `deploy` waits up to ~2 min; the **first-ever pull of a new image** on a node can

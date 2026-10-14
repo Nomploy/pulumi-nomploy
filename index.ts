@@ -13,6 +13,10 @@ const config = new pulumi.Config();
 const endpoint = config.require("endpoint");
 const apiKey = config.requireSecret("apiKey");
 const host = config.get("host"); // optional: skip the Domain if unset
+// Databases bind their engine port as a STATIC host port and default to the
+// control plane, which usually already runs a DB on that port. On a multi-node
+// cluster, target a worker so the port is free (see README). Optional.
+const dbServerId = config.get("dbServerId");
 
 const conn = { endpoint, apiKey };
 
@@ -28,6 +32,7 @@ const db = new Postgres("demo-db", {
 	...conn,
 	name: "db",
 	environmentId: project.environmentId,
+	serverId: dbServerId, // target a worker to avoid a control-plane port clash
 	databaseName: "app",
 	databaseUser: "app",
 	databasePassword: config.requireSecret("dbPassword"),

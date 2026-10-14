@@ -245,8 +245,8 @@ const applicationProvider: pulumi.dynamic.ResourceProvider = {
 				...APP_SOURCE_KEYS,
 			]),
 			// environmentId / appName are fixed at create → changing them replaces.
-			replaces: changed(olds, news, ["environmentId", "appName"])
-				? ["environmentId", "appName"]
+			replaces: changed(olds, news, ["environmentId", "appName", "serverId"])
+				? ["environmentId", "appName", "serverId"]
 				: [],
 			deleteBeforeReplace: true,
 		};
@@ -478,8 +478,8 @@ const databaseProvider: pulumi.dynamic.ResourceProvider = {
 		return {
 			changes: changed(olds, news, [...DB_FIELDS, "deploy"]),
 			// engine / environmentId / appName are fixed at create → replace.
-			replaces: changed(olds, news, ["engine", "environmentId", "appName"])
-				? ["engine", "environmentId", "appName"]
+			replaces: changed(olds, news, ["engine", "environmentId", "appName", "serverId"])
+				? ["engine", "environmentId", "appName", "serverId"]
 				: [],
 			deleteBeforeReplace: true,
 		};
@@ -605,8 +605,8 @@ const composeProvider: pulumi.dynamic.ResourceProvider = {
 	async diff(_id, olds, news) {
 		return {
 			changes: changed(olds, news, [...COMPOSE_FIELDS, "deploy"]),
-			replaces: changed(olds, news, ["environmentId", "appName"])
-				? ["environmentId", "appName"]
+			replaces: changed(olds, news, ["environmentId", "appName", "serverId"])
+				? ["environmentId", "appName", "serverId"]
 				: [],
 			deleteBeforeReplace: true,
 		};
