@@ -8,8 +8,8 @@ domain` lifecycle; extend it from there.
 > **Status:** prototype. It creates/reads/updates/deletes projects, applications
 > (**Docker image or generic git source**, with **deploy**), domains, the five
 > **databases** (postgres / mysql / mariadb / mongo / redis), and **compose**
-> services (raw compose file or Nomad Pack). Codegen from the OpenAPI spec is the
-> remaining increment (see *Extending*).
+> services (raw compose file or Nomad Pack), with **typed API types generated from
+> the OpenAPI spec**. It has not yet been run against a live cluster (`pulumi up`).
 
 ## How it works
 
@@ -69,7 +69,6 @@ new nomploy.Compose("stack", {
 ## Use it
 
 ```bash
-cd iac/nomploy-pulumi
 npm install
 
 pulumi stack init dev
@@ -93,16 +92,17 @@ pulumi destroy     # tear it all down
   generic `Database` with an `engine`), each with `deploy`.
 - **Compose:** done — `Compose` takes a raw `composeFile` (composeType "nomad") or a
   `nomadPack` + `nomadPackRegistry` (composeType "nomad-pack"), with `deploy`.
-- **Codegen (done):** `src/nomploy/api-types.ts` is generated from the panel's
-  OpenAPI spec (`npm run gen:types`, which runs `openapi-typescript` over the
-  repo-root `openapi.json`). `client.ts` exposes typed `get`/`post` helpers plus
-  `ApiBody<P>` / `ApiQuery<P>` / `ApiResponse<P>` for any spec path `P` (e.g.
-  `post(conn, "/project.create", { name })` type-checks the body). Note: the spec's
-  **response** schemas are thin, so the providers still read create responses via the
-  untyped `call` (which also builds the DB engine's runtime paths); the typed helpers
-  are for typed request bodies/queries and new code.
-  Regenerate against a live/updated instance with
-  `apps/dokploy/scripts/generate-openapi.ts` (the committed `openapi.json` can lag).
+- **Codegen (done):** `src/nomploy/api-types.ts` is generated from the vendored
+  `openapi.json` (`npm run gen:types`, which runs `openapi-typescript`). `client.ts`
+  exposes typed `get`/`post` helpers plus `ApiBody<P>` / `ApiQuery<P>` /
+  `ApiResponse<P>` for any spec path `P` (e.g. `post(conn, "/project.create", { name })`
+  type-checks the body). Note: the spec's **response** schemas are thin, so the
+  providers still read create responses via the untyped `call` (which also builds the
+  DB engine's runtime paths); the typed helpers are for typed request bodies/queries
+  and new code.
+  The vendored `openapi.json` comes from the nomploy repo
+  (`apps/dokploy/scripts/generate-openapi.ts`) and can lag your instance — drop in a
+  fresh spec and re-run `npm run gen:types` to update the types.
 
 ## Notes / caveats
 
