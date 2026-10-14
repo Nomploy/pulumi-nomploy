@@ -3,7 +3,7 @@ name = "nomploy-pulumi"
 version = "0.1.0"
 description = "Pulumi dynamic provider for nomploy (Python)."
 requires-python = ">=3.8"
-dependencies = ["pulumi>=3.0.0,<4.0.0"]
+dependencies = ["pulumi>=3.0.0,<4.0.0", "certifi"]
 
 [build-system]
 requires = ["setuptools>=61"]

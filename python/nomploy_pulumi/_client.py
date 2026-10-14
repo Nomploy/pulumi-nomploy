@@ -9,10 +9,26 @@ from __future__ import annotations
 
 import json
 import socket
+import ssl
 import urllib.error
 import urllib.parse
 import urllib.request
 from typing import Any, Optional
+
+
+def _ssl_context() -> ssl.SSLContext:
+    """A verifying TLS context with a usable CA bundle. Python on macOS (and some
+    minimal images) ships no system CA bundle, so verification fails with
+    CERTIFICATE_VERIFY_FAILED; prefer certifi's bundle when available."""
+    try:
+        import certifi
+
+        return ssl.create_default_context(cafile=certifi.where())
+    except Exception:
+        return ssl.create_default_context()
+
+
+_SSL = _ssl_context()
 
 
 def _url(endpoint: str, proc: str) -> str:
@@ -40,7 +56,7 @@ def call(conn: dict, proc: str, data: Optional[dict], method: str) -> Any:
             url, data=body, headers=_headers(conn["apiKey"]), method="POST"
         )
     try:
-        with urllib.request.urlopen(req) as resp:
+        with urllib.request.urlopen(req, context=_SSL) as resp:
             text = resp.read().decode()
     except urllib.error.HTTPError as e:
         detail = e.read().decode(errors="replace")[:500]
@@ -63,7 +79,7 @@ def trigger(conn: dict, proc: str, data: dict, wait: int = 120) -> None:
         url, data=body, headers=_headers(conn["apiKey"]), method="POST"
     )
     try:
-        with urllib.request.urlopen(req, timeout=wait) as resp:
+        with urllib.request.urlopen(req, timeout=wait, context=_SSL) as resp:
             resp.read()
     except urllib.error.HTTPError as e:
         detail = e.read().decode(errors="replace")[:300]
