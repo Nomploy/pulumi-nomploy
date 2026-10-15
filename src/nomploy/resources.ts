@@ -10,9 +10,12 @@ import { type Conn, call, trigger } from "./client";
 
 // ─── shared helpers ──────────────────────────────────────────────────────────
 
+// Env vars override the values stored in state, so you can recover (e.g.
+// `pulumi destroy`/`refresh`) with a fresh key after the stored one is rotated or
+// expires — set NOMPLOY_API_KEY (and optionally NOMPLOY_ENDPOINT).
 const connOf = (props: any): Conn => ({
-	endpoint: props.endpoint,
-	apiKey: props.apiKey,
+	endpoint: process.env.NOMPLOY_ENDPOINT || props.endpoint,
+	apiKey: process.env.NOMPLOY_API_KEY || props.apiKey,
 });
 
 /** Did any of the given non-connection keys change? */

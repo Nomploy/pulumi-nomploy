@@ -171,7 +171,19 @@ Resources: `Project`, `Application`, `Domain`, `Postgres` / `Mysql` / `Mariadb` 
   internally; the OpenAPI handler is expected to emit plain JSON, which this client
   assumes.
 - It's a **dynamic provider**, so connection details (`endpoint`, `apiKey`) travel
-  as resource inputs rather than ambient config.
+  as resource inputs and are stored in state. If the API key is later rotated or
+  expires, operations that use the stored key (notably `pulumi destroy`) fail with
+  `401`. Override the connection with env vars for that run — they take precedence
+  over state:
+
+  ```bash
+  export NOMPLOY_ENDPOINT=https://your-nomploy-instance.com
+  export NOMPLOY_API_KEY=<a-fresh-key>
+  pulumi destroy
+  ```
+
+  (As a last resort, delete the services in the panel and `pulumi stack rm <stack>
+  --force` to abandon the state.)
 - `Compose` destroy keeps volumes unless `deleteVolumesOnDestroy: true`.
 - **Database node placement.** A database binds its engine port (5432, 3306, …) as
   a **static host port** and defaults to the **control plane**, which already runs

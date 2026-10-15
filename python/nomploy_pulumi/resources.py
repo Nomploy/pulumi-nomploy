@@ -8,6 +8,7 @@ travel as resource inputs); ``api_key`` is kept out of the state file via
 
 from __future__ import annotations
 
+import os
 from typing import Any, Optional
 
 import pulumi
@@ -25,7 +26,13 @@ from ._client import call, trigger
 # ---- helpers ---------------------------------------------------------------
 
 def _conn(p: dict) -> dict:
-    return {"endpoint": p["endpoint"], "apiKey": p["api_key"]}
+    # Env vars override the values stored in state, so you can recover (e.g.
+    # `pulumi destroy`/`refresh`) with a fresh key after the stored one is rotated
+    # or expires — set NOMPLOY_API_KEY (and optionally NOMPLOY_ENDPOINT).
+    return {
+        "endpoint": os.environ.get("NOMPLOY_ENDPOINT") or p["endpoint"],
+        "apiKey": os.environ.get("NOMPLOY_API_KEY") or p.get("api_key"),
+    }
 
 
 def _changed(olds: dict, news: dict, keys: list) -> bool:
